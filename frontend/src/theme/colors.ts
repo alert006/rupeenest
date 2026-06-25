@@ -1,0 +1,86 @@
+export const lightColors = {
+  surface: "#F6FAF8",
+  onSurface: "#1A2E28",
+  surfaceSecondary: "#E7F3EF",
+  onSurfaceSecondary: "#223D35",
+  surfaceTertiary: "#D1EAE1",
+  onSurfaceTertiary: "#18382F",
+  surfaceInverse: "#1F2B27",
+  onSurfaceInverse: "#F6FAF8",
+  brand: "#056C5A",
+  brandPrimary: "#056C5A",
+  onBrandPrimary: "#FFFFFF",
+  brandSecondary: "#128F76",
+  onBrandSecondary: "#FFFFFF",
+  brandTertiary: "#A5D6C9",
+  onBrandTertiary: "#0B4A3E",
+  success: "#1E874B",
+  onSuccess: "#FFFFFF",
+  warning: "#C76D00",
+  onWarning: "#FFFFFF",
+  error: "#BA1A1A",
+  onError: "#FFFFFF",
+  info: "#6D726F",
+  onInfo: "#FFFFFF",
+  border: "#D1EAE1",
+  borderStrong: "#A5D6C9",
+  divider: "#E7F3EF",
+};
+
+export const darkColors = {
+  surface: "#0F1714",
+  onSurface: "#E3EFEA",
+  surfaceSecondary: "#1A2622",
+  onSurfaceSecondary: "#C5DCD4",
+  surfaceTertiary: "#243630",
+  onSurfaceTertiary: "#A8C7BC",
+  surfaceInverse: "#E3EFEA",
+  onSurfaceInverse: "#0F1714",
+  brand: "#45D0B2",
+  brandPrimary: "#45D0B2",
+  onBrandPrimary: "#07382E",
+  brandSecondary: "#2BB598",
+  onBrandSecondary: "#032820",
+  brandTertiary: "#1F594A",
+  onBrandTertiary: "#8EF2D7",
+  success: "#37A365",
+  onSuccess: "#00391A",
+  warning: "#EDB059",
+  onWarning: "#452800",
+  error: "#FFB4AB",
+  onError: "#690005",
+  info: "#A4AAA6",
+  onInfo: "#171C1A",
+  border: "#243630",
+  borderStrong: "#45D0B2",
+  divider: "#1A2622",
+};
+
+export type ColorTokens = typeof lightColors;
+
+export const spacing = {
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 24,
+  "2xl": 32,
+  "3xl": 48,
+};
+
+export const radius = {
+  sm: 6,
+  md: 12,
+  lg: 20,
+  pill: 999,
+};
+
+export const fontSize = {
+  sm: 12,
+  base: 14,
+  lg: 16,
+  xl: 20,
+  "2xl": 24,
+  "3xl": 32,
+  "4xl": 40,
+};

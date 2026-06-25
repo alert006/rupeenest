@@ -1,20 +1,24 @@
 {
   "expo": {
-    "name": "frontend",
-    "slug": "frontend",
+    "name": "RupeeNest",
+    "slug": "rupeenest",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "frontend",
+    "scheme": "rupeenest",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.rupeenest.app",
+      "buildNumber": "1"
     },
     "android": {
+      "package": "com.rupeenest.app",
+      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#000"
+        "backgroundColor": "#056C5A"
       },
       "edgeToEdgeEnabled": true
     },
@@ -31,7 +35,10 @@
           "image": "./assets/images/splash-image.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#000"
+          "backgroundColor": "#056C5A",
+          "dark": {
+            "backgroundColor": "#0F1714"
+          }
         }
       ]
     ],
