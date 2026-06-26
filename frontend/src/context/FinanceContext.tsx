@@ -1,7 +1,8 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { CategoryKey } from "../utils/categories";
+import { Bucket, CategoryKey, bucketOfCategory } from "../utils/categories";
 import { isSameMonth } from "../utils/format";
+import { deriveTargets, SmartBudget, SmartBudgetTotals } from "../utils/insights";
 
 export type TransactionType = "income" | "expense";
 
@@ -10,16 +11,26 @@ export type Transaction = {
   amount: number;
   type: TransactionType;
   category: CategoryKey;
+  bucket?: Bucket; // explicit override; expenses without override use category default
   date: string; // ISO
   notes?: string;
   merchant?: string;
 };
 
+export type Prefs = {
+  notificationsEnabled: boolean;
+  pinEnabled: boolean;
+  biometricEnabled: boolean;
+  isPremium: boolean;
+};
+
 type State = {
   hydrated: boolean;
   userName: string;
-  monthlyBudget: number;
+  monthlyBudget: number; // legacy single-budget, kept for back-compat
+  smartBudget: SmartBudget; // overrides, 0 = auto
   transactions: Transaction[];
+  prefs: Prefs;
 };
 
 type FinanceContextValue = State & {
@@ -28,6 +39,8 @@ type FinanceContextValue = State & {
   deleteTransaction: (id: string) => Promise<void>;
   setUserName: (name: string) => Promise<void>;
   setMonthlyBudget: (amount: number) => Promise<void>;
+  setSmartBudget: (b: SmartBudget) => Promise<void>;
+  setPrefs: (patch: Partial<Prefs>) => Promise<void>;
   clearAll: () => Promise<void>;
   totals: {
     income: number;
@@ -38,6 +51,7 @@ type FinanceContextValue = State & {
     monthExpenses: number;
     monthBalance: number;
   };
+  smartBudgetTotals: SmartBudgetTotals;
 };
 
 const FinanceContext = createContext<FinanceContextValue | undefined>(undefined);
@@ -45,9 +59,25 @@ const FinanceContext = createContext<FinanceContextValue | undefined>(undefined)
 const KEY_TRANSACTIONS = "@rupeenest:transactions";
 const KEY_USER = "@rupeenest:user";
 const KEY_BUDGET = "@rupeenest:budget";
+const KEY_SMART_BUDGET = "@rupeenest:smart-budget";
+const KEY_PREFS = "@rupeenest:prefs";
+
+const DEFAULT_PREFS: Prefs = {
+  notificationsEnabled: false,
+  pinEnabled: false,
+  biometricEnabled: false,
+  isPremium: false,
+};
+
+const DEFAULT_SMART: SmartBudget = { needs: 0, wants: 0, savings: 0 };
 
 function uid(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function effectiveBucket(t: Transaction): Bucket | null {
+  if (t.type !== "expense") return null;
+  return t.bucket ?? bucketOfCategory(t.category);
 }
 
 export function FinanceProvider({ children }: { children: React.ReactNode }) {
@@ -55,23 +85,28 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     hydrated: false,
     userName: "Friend",
     monthlyBudget: 0,
+    smartBudget: DEFAULT_SMART,
     transactions: [],
+    prefs: DEFAULT_PREFS,
   });
 
   useEffect(() => {
     (async () => {
       try {
-        const [txRaw, userRaw, budgetRaw] = await Promise.all([
+        const [txRaw, userRaw, budgetRaw, smartRaw, prefsRaw] = await Promise.all([
           AsyncStorage.getItem(KEY_TRANSACTIONS),
           AsyncStorage.getItem(KEY_USER),
           AsyncStorage.getItem(KEY_BUDGET),
+          AsyncStorage.getItem(KEY_SMART_BUDGET),
+          AsyncStorage.getItem(KEY_PREFS),
         ]);
-        const transactions: Transaction[] = txRaw ? JSON.parse(txRaw) : [];
         setState({
           hydrated: true,
           userName: userRaw || "Friend",
           monthlyBudget: budgetRaw ? Number(budgetRaw) : 0,
-          transactions,
+          smartBudget: smartRaw ? { ...DEFAULT_SMART, ...JSON.parse(smartRaw) } : DEFAULT_SMART,
+          transactions: txRaw ? JSON.parse(txRaw) : [],
+          prefs: prefsRaw ? { ...DEFAULT_PREFS, ...JSON.parse(prefsRaw) } : DEFAULT_PREFS,
         });
       } catch {
         setState((s) => ({ ...s, hydrated: true }));
@@ -118,6 +153,19 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.setItem(KEY_BUDGET, String(amount));
   }, []);
 
+  const setSmartBudget = useCallback(async (b: SmartBudget) => {
+    setState((s) => ({ ...s, smartBudget: b }));
+    await AsyncStorage.setItem(KEY_SMART_BUDGET, JSON.stringify(b));
+  }, []);
+
+  const setPrefs = useCallback(async (patch: Partial<Prefs>) => {
+    setState((s) => {
+      const next = { ...s.prefs, ...patch };
+      AsyncStorage.setItem(KEY_PREFS, JSON.stringify(next));
+      return { ...s, prefs: next };
+    });
+  }, []);
+
   const clearAll = useCallback(async () => {
     await AsyncStorage.removeItem(KEY_TRANSACTIONS);
     setState((s) => ({ ...s, transactions: [] }));
@@ -143,6 +191,36 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     };
   }, [state.transactions]);
 
+  const smartBudgetTotals: SmartBudgetTotals = useMemo(() => {
+    const ref = new Date();
+    const spent = { needs: 0, wants: 0, savings: 0 };
+    for (const t of state.transactions) {
+      if (!isSameMonth(t.date, ref)) continue;
+      const b = effectiveBucket(t);
+      if (!b) continue;
+      spent[b] += t.amount;
+    }
+    const targets = deriveTargets(totals.monthIncome, state.smartBudget);
+    const remaining = {
+      needs: Math.max(0, targets.needs - spent.needs),
+      wants: Math.max(0, targets.wants - spent.wants),
+      savings: Math.max(0, targets.savings - spent.savings),
+    };
+    const progress = {
+      needs: targets.needs > 0 ? Math.min(1, spent.needs / targets.needs) : 0,
+      wants: targets.wants > 0 ? Math.min(1, spent.wants / targets.wants) : 0,
+      savings: targets.savings > 0 ? Math.min(1, spent.savings / targets.savings) : 0,
+    };
+    return {
+      targets,
+      spent,
+      remaining,
+      progress,
+      totalTarget: targets.needs + targets.wants + targets.savings,
+      totalSpent: spent.needs + spent.wants + spent.savings,
+    };
+  }, [state.transactions, state.smartBudget, totals.monthIncome]);
+
   const value = useMemo<FinanceContextValue>(() => ({
     ...state,
     addTransaction,
@@ -150,9 +228,16 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     deleteTransaction,
     setUserName,
     setMonthlyBudget,
+    setSmartBudget,
+    setPrefs,
     clearAll,
     totals,
-  }), [state, addTransaction, updateTransaction, deleteTransaction, setUserName, setMonthlyBudget, clearAll, totals]);
+    smartBudgetTotals,
+  }), [
+    state, addTransaction, updateTransaction, deleteTransaction,
+    setUserName, setMonthlyBudget, setSmartBudget, setPrefs, clearAll,
+    totals, smartBudgetTotals,
+  ]);
 
   return <FinanceContext.Provider value={value}>{children}</FinanceContext.Provider>;
 }

@@ -1,27 +1,27 @@
 export const lightColors = {
-  surface: "#FFFFFF",
-  onSurface: "#111827",
-
-  surfaceSecondary: "#F8FAFC",
-  onSurfaceSecondary: "#334155",
-
-  surfaceTertiary: "#EFF6FF",
-  onSurfaceTertiary: "#1E3A8A",
-
-  surfaceInverse: "#1E3A8A",
-  onSurfaceInverse: "#FFFFFF",
-
+  surface: "#F4F7FB",
+  onSurface: "#0E1A2B",
+  surfaceSecondary: "#E6EEF8",
+  onSurfaceSecondary: "#16263E",
+  surfaceTertiary: "#D5E2F2",
+  onSurfaceTertiary: "#0E2547",
+  surfaceInverse: "#0E1A2B",
+  onSurfaceInverse: "#F4F7FB",
   brand: "#2563EB",
   brandPrimary: "#2563EB",
   onBrandPrimary: "#FFFFFF",
-
-  brandSecondary: "#60A5FA",
+  brandSecondary: "#1D4ED8",
   onBrandSecondary: "#FFFFFF",
-
-  brandTertiary: "#DBEAFE",
-  onBrandTertiary: "#1E3A8A",
-
-  success: "#16A34A",
+  brandTertiary: "#BFD3F4",
+  onBrandTertiary: "#0E2547",
+  // Bucket accents — Needs, Wants, Savings (avoid greens)
+  bucketNeeds: "#2563EB",     // blue
+  bucketNeedsSoft: "#DDE8FB",
+  bucketWants: "#F59E0B",     // amber
+  bucketWantsSoft: "#FEF1D6",
+  bucketSavings: "#8B5CF6",   // violet
+  bucketSavingsSoft: "#EBE2FB",
+  success: "#2563EB",
   onSuccess: "#FFFFFF",
 
   warning: "#F59E0B",
@@ -29,42 +29,46 @@ export const lightColors = {
 
   error: "#DC2626",
   onError: "#FFFFFF",
-
-  info: "#3B82F6",
+  info: "#5B6B82",
   onInfo: "#FFFFFF",
-
-  border: "#E5E7EB",
-  borderStrong: "#93C5FD",
-  divider: "#F1F5F9",
+  border: "#D5E2F2",
+  borderStrong: "#BFD3F4",
+  divider: "#E6EEF8",
 };
 
 export const darkColors = {
-  surface: "#0F1714",
-  onSurface: "#E3EFEA",
-  surfaceSecondary: "#1A2622",
-  onSurfaceSecondary: "#C5DCD4",
-  surfaceTertiary: "#243630",
-  onSurfaceTertiary: "#A8C7BC",
-  surfaceInverse: "#E3EFEA",
-  onSurfaceInverse: "#0F1714",
-  brand: "#45D0B2",
-  brandPrimary: "#45D0B2",
-  onBrandPrimary: "#07382E",
-  brandSecondary: "#2BB598",
-  onBrandSecondary: "#032820",
-  brandTertiary: "#1F594A",
-  onBrandTertiary: "#8EF2D7",
-  success: "#37A365",
-  onSuccess: "#00391A",
+  surface: "#0B1220",
+  onSurface: "#E3EAF6",
+  surfaceSecondary: "#15203A",
+  onSurfaceSecondary: "#C5D4EC",
+  surfaceTertiary: "#1E2C4D",
+  onSurfaceTertiary: "#A8BEE0",
+  surfaceInverse: "#E3EAF6",
+  onSurfaceInverse: "#0B1220",
+  brand: "#60A5FA",
+  brandPrimary: "#60A5FA",
+  onBrandPrimary: "#0A1A33",
+  brandSecondary: "#3B82F6",
+  onBrandSecondary: "#031026",
+  brandTertiary: "#1E3A6B",
+  onBrandTertiary: "#BFD3F4",
+  bucketNeeds: "#60A5FA",
+  bucketNeedsSoft: "#1E3A6B",
+  bucketWants: "#FBBF24",
+  bucketWantsSoft: "#3A2A0A",
+  bucketSavings: "#A78BFA",
+  bucketSavingsSoft: "#2F1F55",
+  success: "#60A5FA",
+  onSuccess: "#0A1A33",
   warning: "#EDB059",
   onWarning: "#452800",
   error: "#FFB4AB",
   onError: "#690005",
-  info: "#A4AAA6",
-  onInfo: "#171C1A",
-  border: "#243630",
-  borderStrong: "#45D0B2",
-  divider: "#1A2622",
+  info: "#94A3B8",
+  onInfo: "#0F172A",
+  border: "#1E2C4D",
+  borderStrong: "#60A5FA",
+  divider: "#15203A",
 };
 
 export type ColorTokens = typeof lightColors;

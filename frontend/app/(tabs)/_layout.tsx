@@ -69,13 +69,13 @@ paddingBottom: 12,
         }}
       />
       <Tabs.Screen
-        name="reports"
+        name="insights"
         options={{
-          title: "Reports",
+          title: "Insights",
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="chart-bar" size={size} color={color} />
+            <MaterialCommunityIcons name="lightbulb-on-outline" size={size} color={color} />
           ),
-          tabBarButtonTestID: "tab-reports",
+          tabBarButtonTestID: "tab-insights",
         }}
       />
       <Tabs.Screen

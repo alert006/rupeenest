@@ -10,8 +10,6 @@ import { useIconFonts } from "@/src/hooks/use-icon-fonts";
 import { ThemeProvider, useTheme } from "@/src/theme/ThemeContext";
 import { FinanceProvider } from "@/src/context/FinanceContext";
 
-// Disable logbox errors etc so that users can see the app
-// and agent works as expected.
 LogBox.ignoreAllLogs(true);
 
 // Keep the native splash visible from cold start until icon fonts register.
@@ -37,6 +35,11 @@ function ThemedStack() {
           options={{ presentation: "modal", animation: "slide_from_bottom" }}
         />
         <Stack.Screen name="settings" options={{ animation: "slide_from_right" }} />
+        <Stack.Screen name="premium" options={{ animation: "slide_from_right" }} />
+        <Stack.Screen
+          name="pin-setup"
+          options={{ presentation: "modal", animation: "slide_from_bottom" }}
+        />
       </Stack>
     </View>
   );
@@ -51,8 +54,6 @@ export default function RootLayout() {
     }
   }, [loaded, error]);
 
-  // If the CDN is unreachable we fall through on error rather than wedging
-  // the app — icons will tofu, but the app still boots.
   if (!loaded && !error) return null;
 
   return (
