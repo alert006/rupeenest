@@ -8,11 +8,12 @@ import { useFinance } from "@/src/context/FinanceContext";
 import { Card } from "@/src/components/Card";
 import { spacing, radius, fontSize } from "@/src/theme/colors";
 import { formatINR, monthName, isSameMonth } from "@/src/utils/format";
-import { getCategory } from "@/src/utils/categories";
+import { getCategory, BUCKET_META, Bucket, bucketOfCategory } from "@/src/utils/categories";
+import { computeBudgetScore, smartInsight } from "@/src/utils/insights";
 
-export default function ReportsScreen() {
+export default function InsightsScreen() {
   const { colors } = useTheme();
-  const { transactions, totals } = useFinance();
+  const { transactions, totals, smartBudgetTotals } = useFinance();
 
   const last6Months = useMemo(() => {
     const months: { label: string; income: number; expense: number }[] = [];
@@ -52,10 +53,24 @@ export default function ReportsScreen() {
 
   const totalThisMonth = topCategories.reduce((s, x) => s + x.amount, 0);
 
-  const savingsRate =
-    totals.monthIncome > 0
-      ? Math.max(0, Math.min(100, ((totals.monthIncome - totals.monthExpenses) / totals.monthIncome) * 100))
-      : 0;
+  const budgetScore = useMemo(() => computeBudgetScore(smartBudgetTotals), [smartBudgetTotals]);
+  const insight = useMemo(
+    () => smartInsight(smartBudgetTotals, totals.monthIncome),
+    [smartBudgetTotals, totals.monthIncome]
+  );
+
+  const bucketSpend: Record<Bucket, number> = useMemo(() => {
+    const acc = { needs: 0, wants: 0, savings: 0 };
+    for (const t of transactions) {
+      if (t.type !== "expense" || !isSameMonth(t.date)) continue;
+      const b = t.bucket ?? bucketOfCategory(t.category);
+      if (b) acc[b] += t.amount;
+    }
+    return acc;
+  }, [transactions]);
+
+  const scoreColor =
+    budgetScore >= 75 ? colors.brandPrimary : budgetScore >= 50 ? colors.warning : colors.error;
 
   return (
     <SafeAreaView edges={["top"]} style={[styles.safe, { backgroundColor: colors.surface }]}>
@@ -67,12 +82,12 @@ export default function ReportsScreen() {
         }}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={[styles.title, { color: colors.onSurface }]}>Reports</Text>
+        <Text style={[styles.title, { color: colors.onSurface }]}>Insights</Text>
         <Text style={[styles.subtitle, { color: colors.info }]}>{monthName()}</Text>
 
         <View style={styles.statsRow}>
           <Card variant="secondary" style={styles.statCard}>
-            <MaterialCommunityIcons name="trending-up" size={22} color={colors.success} />
+            <MaterialCommunityIcons name="trending-up" size={22} color={colors.brandPrimary} />
             <Text style={[styles.statLabel, { color: colors.info }]}>Income</Text>
             <Text style={[styles.statValue, { color: colors.onSurface }]}>
               {formatINR(totals.monthIncome, { compact: true })}
@@ -86,15 +101,88 @@ export default function ReportsScreen() {
             </Text>
           </Card>
           <Card variant="secondary" style={styles.statCard}>
-            <MaterialCommunityIcons name="piggy-bank-outline" size={22} color={colors.brandPrimary} />
-            <Text style={[styles.statLabel, { color: colors.info }]}>Savings</Text>
+            <MaterialCommunityIcons name="scale-balance" size={22} color={colors.brandSecondary} />
+            <Text style={[styles.statLabel, { color: colors.info }]}>Net</Text>
             <Text style={[styles.statValue, { color: colors.onSurface }]}>
-              {Math.round(savingsRate)}%
+              {formatINR(totals.monthIncome - totals.monthExpenses, { compact: true })}
             </Text>
           </Card>
         </View>
 
-        <Text style={[styles.section, { color: colors.onSurface }]}>Last 6 Months</Text>
+        <Text style={[styles.section, { color: colors.onSurface }]}>Budget Score</Text>
+        <Card variant="secondary">
+          <View style={styles.scoreRow}>
+            <Text style={[styles.scoreValue, { color: scoreColor }]} testID="insights-budget-score">
+              {budgetScore}
+            </Text>
+            <Text style={[styles.scoreMax, { color: colors.info }]}> / 100</Text>
+          </View>
+          <View style={[styles.scoreTrack, { backgroundColor: colors.surfaceTertiary }]}>
+            <View
+              style={{
+                width: `${budgetScore}%`,
+                height: "100%",
+                backgroundColor: scoreColor,
+                borderRadius: radius.pill,
+              }}
+            />
+          </View>
+          <View style={[styles.insightRow, { backgroundColor: colors.surfaceTertiary }]}>
+            <MaterialCommunityIcons name="lightbulb-outline" size={18} color={colors.brandPrimary} />
+            <Text style={[styles.insightText, { color: colors.onSurface }]} numberOfLines={2}>
+              {insight}
+            </Text>
+          </View>
+        </Card>
+
+        <Text style={[styles.section, { color: colors.onSurface }]}>Category Breakdown</Text>
+        <Card variant="secondary" padding="md">
+          {(["needs", "wants", "savings"] as Bucket[]).map((b, i) => {
+            const meta = BUCKET_META[b];
+            const total = bucketSpend.needs + bucketSpend.wants + bucketSpend.savings;
+            const share = total > 0 ? bucketSpend[b] / total : 0;
+            const accent =
+              b === "needs"
+                ? colors.bucketNeeds
+                : b === "wants"
+                ? colors.bucketWants
+                : colors.bucketSavings;
+            return (
+              <View
+                key={b}
+                style={[
+                  styles.bucketRow,
+                  i < 2 && {
+                    borderBottomWidth: StyleSheet.hairlineWidth,
+                    borderBottomColor: colors.divider,
+                  },
+                ]}
+              >
+                <View style={styles.bucketTop}>
+                  <View style={styles.bucketLeft}>
+                    <View style={[styles.bucketDot, { backgroundColor: accent }]} />
+                    <Text style={[styles.bucketName, { color: colors.onSurface }]}>{meta.label}</Text>
+                  </View>
+                  <Text style={[styles.bucketAmount, { color: colors.onSurface }]}>
+                    {formatINR(bucketSpend[b], { compact: true })}
+                  </Text>
+                </View>
+                <View style={[styles.bucketTrack, { backgroundColor: colors.surfaceTertiary }]}>
+                  <View
+                    style={{
+                      width: `${share * 100}%`,
+                      height: "100%",
+                      backgroundColor: accent,
+                      borderRadius: radius.pill,
+                    }}
+                  />
+                </View>
+              </View>
+            );
+          })}
+        </Card>
+
+        <Text style={[styles.section, { color: colors.onSurface }]}>Income vs Expenses</Text>
         <Card variant="secondary">
           <View style={styles.chartRow}>
             {last6Months.map((m) => {
@@ -104,7 +192,7 @@ export default function ReportsScreen() {
                 <View key={m.label} style={styles.chartCol}>
                   <View style={styles.bars}>
                     <View style={[styles.bar, { height: inH, backgroundColor: colors.brandPrimary }]} />
-                    <View style={[styles.bar, { height: exH, backgroundColor: colors.warning }]} />
+                    <View style={[styles.bar, { height: exH, backgroundColor: colors.bucketWants }]} />
                   </View>
                   <Text style={[styles.barLabel, { color: colors.info }]}>{m.label}</Text>
                 </View>
@@ -117,7 +205,7 @@ export default function ReportsScreen() {
               <Text style={[styles.legendText, { color: colors.info }]}>Income</Text>
             </View>
             <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: colors.warning }]} />
+              <View style={[styles.legendDot, { backgroundColor: colors.bucketWants }]} />
               <Text style={[styles.legendText, { color: colors.info }]}>Expenses</Text>
             </View>
           </View>
@@ -193,6 +281,25 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: fontSize.sm },
   statValue: { fontSize: fontSize.lg, fontWeight: "500" },
   section: { fontSize: fontSize.xl, fontWeight: "500", marginTop: spacing.xl, marginBottom: spacing.sm },
+  scoreRow: { flexDirection: "row", alignItems: "baseline", marginBottom: spacing.sm },
+  scoreValue: { fontSize: 44, fontWeight: "500" },
+  scoreMax: { fontSize: fontSize.lg, marginLeft: 4 },
+  scoreTrack: { height: 10, borderRadius: radius.pill, overflow: "hidden", marginBottom: spacing.md },
+  insightRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.md,
+  },
+  insightText: { flex: 1, fontSize: fontSize.base },
+  bucketRow: { paddingVertical: spacing.md },
+  bucketTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.sm },
+  bucketLeft: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  bucketDot: { width: 10, height: 10, borderRadius: 5 },
+  bucketName: { fontSize: fontSize.base, fontWeight: "500" },
+  bucketAmount: { fontSize: fontSize.base, fontWeight: "500" },
+  bucketTrack: { height: 6, borderRadius: radius.pill, overflow: "hidden" },
   chartRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", height: 140 },
   chartCol: { alignItems: "center", flex: 1 },
   bars: { flexDirection: "row", alignItems: "flex-end", gap: 4, height: 110 },

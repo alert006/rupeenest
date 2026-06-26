@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -18,7 +18,7 @@ import { useTheme } from "@/src/theme/ThemeContext";
 import { useFinance } from "@/src/context/FinanceContext";
 import { Chip } from "@/src/components/Chip";
 import { spacing, radius, fontSize } from "@/src/theme/colors";
-import { categoriesFor, CategoryKey } from "@/src/utils/categories";
+import { categoriesFor, CategoryKey, Bucket, BUCKET_META, bucketOfCategory } from "@/src/utils/categories";
 import { formatDate } from "@/src/utils/format";
 
 type TxType = "income" | "expense";
@@ -33,7 +33,11 @@ export default function AddTransactionScreen() {
 
   const [type, setType] = useState<TxType>(existing?.type ?? "expense");
   const [amount, setAmount] = useState(existing ? String(existing.amount) : "");
-  const [category, setCategory] = useState<CategoryKey>(existing?.category ?? "food");
+  const [category, setCategory] = useState<CategoryKey>(existing?.category ?? "groceries");
+  const [bucket, setBucket] = useState<Bucket>(
+    existing?.bucket ?? bucketOfCategory(existing?.category ?? "groceries") ?? "needs"
+  );
+  const [bucketTouched, setBucketTouched] = useState<boolean>(!!existing?.bucket);
   const [merchant, setMerchant] = useState(existing?.merchant ?? "");
   const [notes, setNotes] = useState(existing?.notes ?? "");
   const [date, setDate] = useState<Date>(existing ? new Date(existing.date) : new Date());
@@ -41,6 +45,14 @@ export default function AddTransactionScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const availableCategories = useMemo(() => categoriesFor(type), [type]);
+
+  // Auto-classify when category changes (unless user already touched the bucket override).
+  useEffect(() => {
+    if (type !== "expense") return;
+    if (bucketTouched) return;
+    const auto = bucketOfCategory(category);
+    if (auto) setBucket(auto);
+  }, [category, type, bucketTouched]);
 
   const onSave = async () => {
     const n = Number(amount.replace(/[^0-9.]/g, ""));
@@ -52,6 +64,7 @@ export default function AddTransactionScreen() {
       amount: n,
       type,
       category,
+      bucket: type === "expense" ? bucket : undefined,
       merchant: merchant.trim() || undefined,
       notes: notes.trim() || undefined,
       date: date.toISOString(),
@@ -137,6 +150,55 @@ export default function AddTransactionScreen() {
             <Text style={[styles.error, { color: colors.error }]} testID="amount-error">
               {error}
             </Text>
+          ) : null}
+
+          {type === "expense" ? (
+            <>
+              <Text style={[styles.label, { color: colors.info, marginTop: spacing.lg }]}>Smart Budget bucket</Text>
+              <View style={styles.bucketRow}>
+                {(["needs", "wants", "savings"] as Bucket[]).map((b) => {
+                  const selected = bucket === b;
+                  const accent =
+                    b === "needs"
+                      ? colors.bucketNeeds
+                      : b === "wants"
+                      ? colors.bucketWants
+                      : colors.bucketSavings;
+                  const soft =
+                    b === "needs"
+                      ? colors.bucketNeedsSoft
+                      : b === "wants"
+                      ? colors.bucketWantsSoft
+                      : colors.bucketSavingsSoft;
+                  return (
+                    <Pressable
+                      key={b}
+                      testID={`bucket-${b}`}
+                      onPress={() => {
+                        setBucket(b);
+                        setBucketTouched(true);
+                      }}
+                      style={[
+                        styles.bucketChip,
+                        {
+                          backgroundColor: selected ? accent : soft,
+                          borderColor: selected ? accent : "transparent",
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.bucketChipText,
+                          { color: selected ? colors.onBrandPrimary : accent },
+                        ]}
+                      >
+                        {BUCKET_META[b].label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </>
           ) : null}
 
           <Text style={[styles.label, { color: colors.info, marginTop: spacing.lg }]}>Category</Text>
@@ -318,6 +380,15 @@ const styles = StyleSheet.create({
   },
   notes: { minHeight: 80, textAlignVertical: "top", paddingTop: spacing.md },
   error: { fontSize: fontSize.sm, marginTop: spacing.xs },
+  bucketRow: { flexDirection: "row", gap: spacing.sm },
+  bucketChip: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    alignItems: "center",
+  },
+  bucketChipText: { fontSize: fontSize.base, fontWeight: "500" },
   footer: {
     position: "absolute",
     left: 0,

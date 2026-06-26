@@ -15,14 +15,19 @@ import { SectionHeader } from "@/src/components/SectionHeader";
 import { EmptyState } from "@/src/components/EmptyState";
 import { spacing, radius, fontSize } from "@/src/theme/colors";
 import { formatINR, greeting, monthName } from "@/src/utils/format";
+import { Bucket, BUCKET_META } from "@/src/utils/categories";
+import { smartInsight } from "@/src/utils/insights";
 
 export default function Dashboard() {
   const { colors, isDark } = useTheme();
-  const { userName, transactions, totals, monthlyBudget } = useFinance();
+  const { userName, transactions, totals, smartBudgetTotals } = useFinance();
   const router = useRouter();
 
   const recent = useMemo(() => transactions.slice(0, 6), [transactions]);
-  const budgetUsed = monthlyBudget > 0 ? Math.min(1, totals.monthExpenses / monthlyBudget) : 0;
+  const insight = useMemo(
+    () => smartInsight(smartBudgetTotals, totals.monthIncome),
+    [smartBudgetTotals, totals.monthIncome]
+  );
 
   return (
     <SafeAreaView edges={["top"]} style={[styles.safe, { backgroundColor: colors.surface }]}>
@@ -56,7 +61,7 @@ export default function Dashboard() {
             style={styles.heroCard}
           >
             <Text style={[styles.heroLabel, { color: isDark ? colors.onBrandTertiary : colors.onBrandPrimary }]}>
-              Total Balance
+              Current Balance
             </Text>
             <Text
               style={[styles.heroAmount, { color: isDark ? colors.onBrandTertiary : colors.onBrandPrimary }]}
@@ -99,33 +104,34 @@ export default function Dashboard() {
           </LinearGradient>
         </Animated.View>
 
+        <SectionHeader
+          title="Smart Budget"
+          action={
+            <Pressable testID="dashboard-budget-edit" onPress={() => router.push("/(tabs)/budget")}>
+              <Text style={{ color: colors.brandPrimary, fontSize: fontSize.base }}>Edit</Text>
+            </Pressable>
+          }
+        />
+
+        <View style={{ gap: spacing.md }}>
+          <SmartBudgetCard bucket="needs" />
+          <SmartBudgetCard bucket="wants" />
+          <SmartBudgetCard bucket="savings" />
+        </View>
+
         <Animated.View entering={FadeIn.delay(120)}>
-          <Card style={{ marginTop: spacing.lg }} variant="secondary">
-            <View style={styles.budgetTop}>
-              <View>
-                <Text style={[styles.budgetTitle, { color: colors.onSurface }]}>Monthly Budget</Text>
-                <Text style={[styles.budgetSub, { color: colors.info }]}>
-                  {formatINR(totals.monthExpenses)} of {formatINR(monthlyBudget)}
-                </Text>
-              </View>
-              <Pressable
-                testID="dashboard-budget-btn"
-                onPress={() => router.push("/(tabs)/budget")}
-                style={[styles.smallBtn, { backgroundColor: colors.brandPrimary }]}
-              >
-                <Text style={[styles.smallBtnText, { color: colors.onBrandPrimary }]}>Manage</Text>
-              </Pressable>
+          <Card
+            variant="secondary"
+            style={{ marginTop: spacing.lg, flexDirection: "row", alignItems: "center", gap: spacing.md }}
+          >
+            <View style={[styles.insightIcon, { backgroundColor: colors.brandTertiary }]}>
+              <MaterialCommunityIcons name="lightbulb-outline" size={22} color={colors.onBrandTertiary} />
             </View>
-            <View style={[styles.barTrack, { backgroundColor: colors.surfaceTertiary }]}>
-              <View
-                style={{
-                  width: `${budgetUsed * 100}%`,
-                  height: "100%",
-                  backgroundColor:
-                    budgetUsed >= 1 ? colors.error : budgetUsed >= 0.85 ? colors.warning : colors.brandPrimary,
-                  borderRadius: radius.pill,
-                }}
-              />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.insightLabel, { color: colors.info }]}>Smart Insight</Text>
+              <Text style={[styles.insightText, { color: colors.onSurface }]} testID="dashboard-smart-insight">
+                {insight}
+              </Text>
             </View>
           </Card>
         </Animated.View>
@@ -180,6 +186,75 @@ export default function Dashboard() {
   );
 }
 
+function SmartBudgetCard({ bucket }: { bucket: Bucket }) {
+  const { colors } = useTheme();
+  const { smartBudgetTotals } = useFinance();
+  const meta = BUCKET_META[bucket];
+  const target = smartBudgetTotals.targets[bucket];
+  const spent = smartBudgetTotals.spent[bucket];
+  const remaining = smartBudgetTotals.remaining[bucket];
+  const progress = smartBudgetTotals.progress[bucket];
+  const accent =
+    bucket === "needs" ? colors.bucketNeeds : bucket === "wants" ? colors.bucketWants : colors.bucketSavings;
+  const accentSoft =
+    bucket === "needs"
+      ? colors.bucketNeedsSoft
+      : bucket === "wants"
+      ? colors.bucketWantsSoft
+      : colors.bucketSavingsSoft;
+  const isSavings = bucket === "savings";
+
+  return (
+    <Card variant="secondary" testID={`smart-budget-${bucket}`}>
+      <View style={styles.smartTop}>
+        <View style={[styles.smartIcon, { backgroundColor: accentSoft }]}>
+          <MaterialCommunityIcons
+            name={meta.icon as keyof typeof MaterialCommunityIcons.glyphMap}
+            size={20}
+            color={accent}
+          />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.smartTitle, { color: colors.onSurface }]}>{meta.label}</Text>
+          <Text style={[styles.smartSub, { color: colors.info }]}>{meta.description}</Text>
+        </View>
+        <Text style={[styles.smartTarget, { color: colors.onSurface }]}>
+          {formatINR(target, { compact: true })}
+        </Text>
+      </View>
+      <View style={styles.smartRow}>
+        <Metric label={isSavings ? "Saved" : "Spent"} value={formatINR(spent, { compact: true })} />
+        <Metric
+          label={isSavings ? "Goal" : "Target"}
+          value={formatINR(target, { compact: true })}
+        />
+        <Metric label="Remaining" value={formatINR(remaining, { compact: true })} />
+      </View>
+      <View style={[styles.smartTrack, { backgroundColor: colors.surfaceTertiary }]}>
+        <View
+          testID={`smart-progress-${bucket}`}
+          style={{
+            width: `${progress * 100}%`,
+            height: "100%",
+            backgroundColor: accent,
+            borderRadius: radius.pill,
+          }}
+        />
+      </View>
+    </Card>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  const { colors } = useTheme();
+  return (
+    <View style={{ flex: 1 }}>
+      <Text style={[styles.metricLabel, { color: colors.info }]}>{label}</Text>
+      <Text style={[styles.metricValue, { color: colors.onSurface }]}>{value}</Text>
+    </View>
+  );
+}
+
 function HeroPill({
   icon,
   label,
@@ -222,18 +297,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  heroCard: {
-    borderRadius: radius.lg,
-    padding: spacing.xl,
-  },
+  heroCard: { borderRadius: radius.lg, padding: spacing.xl },
   heroLabel: { fontSize: fontSize.base, opacity: 0.9 },
   heroAmount: { fontSize: 36, fontWeight: "500", marginTop: spacing.xs, letterSpacing: -0.5 },
   heroSub: { fontSize: fontSize.sm, marginTop: 2 },
-  heroRow: {
-    flexDirection: "row",
-    marginTop: spacing.xl,
-    gap: spacing.sm,
-  },
+  heroRow: { flexDirection: "row", marginTop: spacing.xl, gap: spacing.sm },
   heroPill: {
     flex: 1,
     paddingVertical: spacing.md,
@@ -243,17 +311,18 @@ const styles = StyleSheet.create({
   },
   heroPillLabel: { fontSize: 11, marginTop: 4 },
   heroPillValue: { fontSize: fontSize.lg, fontWeight: "500", marginTop: 2 },
-  budgetTop: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: spacing.md,
-  },
-  budgetTitle: { fontSize: fontSize.lg, fontWeight: "500" },
-  budgetSub: { fontSize: fontSize.sm, marginTop: 2 },
-  smallBtn: { paddingHorizontal: spacing.md, paddingVertical: 8, borderRadius: radius.pill },
-  smallBtnText: { fontSize: fontSize.sm, fontWeight: "500" },
-  barTrack: { height: 10, borderRadius: radius.pill, overflow: "hidden" },
+  smartTop: { flexDirection: "row", alignItems: "center", gap: spacing.md, marginBottom: spacing.md },
+  smartIcon: { width: 40, height: 40, borderRadius: radius.md, alignItems: "center", justifyContent: "center" },
+  smartTitle: { fontSize: fontSize.lg, fontWeight: "500" },
+  smartSub: { fontSize: fontSize.sm, marginTop: 2 },
+  smartTarget: { fontSize: fontSize.lg, fontWeight: "500" },
+  smartRow: { flexDirection: "row", marginBottom: spacing.sm },
+  metricLabel: { fontSize: fontSize.sm },
+  metricValue: { fontSize: fontSize.base, fontWeight: "500", marginTop: 2 },
+  smartTrack: { height: 8, borderRadius: radius.pill, overflow: "hidden" },
+  insightIcon: { width: 40, height: 40, borderRadius: radius.md, alignItems: "center", justifyContent: "center" },
+  insightLabel: { fontSize: fontSize.sm },
+  insightText: { fontSize: fontSize.base, fontWeight: "500", marginTop: 2 },
   divider: { height: StyleSheet.hairlineWidth, marginHorizontal: spacing.md },
   fab: {
     position: "absolute",

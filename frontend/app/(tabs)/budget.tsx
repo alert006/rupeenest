@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useState, useMemo } from "react";
 import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -6,37 +6,36 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { useFinance } from "@/src/context/FinanceContext";
 import { Card } from "@/src/components/Card";
-import { ProgressBar } from "@/src/components/ProgressBar";
 import { spacing, radius, fontSize } from "@/src/theme/colors";
-import { formatINR, monthName, isSameMonth } from "@/src/utils/format";
-import { getCategory } from "@/src/utils/categories";
+import { formatINR, monthName } from "@/src/utils/format";
+import { Bucket, BUCKET_META } from "@/src/utils/categories";
+import { deriveTargets } from "@/src/utils/insights";
 
 export default function BudgetScreen() {
   const { colors } = useTheme();
-  const { monthlyBudget, setMonthlyBudget, transactions, totals } = useFinance();
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(String(monthlyBudget));
+  const { totals, smartBudget, setSmartBudget, smartBudgetTotals } = useFinance();
+  const auto = useMemo(() => deriveTargets(totals.monthIncome, { needs: 0, wants: 0, savings: 0 }), [totals.monthIncome]);
+  const [draft, setDraft] = useState({
+    needs: smartBudget.needs ? String(smartBudget.needs) : "",
+    wants: smartBudget.wants ? String(smartBudget.wants) : "",
+    savings: smartBudget.savings ? String(smartBudget.savings) : "",
+  });
+  const [saved, setSaved] = useState(false);
 
-  const spent = totals.monthExpenses;
-  const remaining = Math.max(0, monthlyBudget - spent);
-  const used = monthlyBudget > 0 ? spent / monthlyBudget : 0;
+  const onSave = () => {
+    setSmartBudget({
+      needs: Number(draft.needs.replace(/[^0-9.]/g, "")) || 0,
+      wants: Number(draft.wants.replace(/[^0-9.]/g, "")) || 0,
+      savings: Number(draft.savings.replace(/[^0-9.]/g, "")) || 0,
+    });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
 
-  const byCategory = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const t of transactions) {
-      if (t.type !== "expense" || !isSameMonth(t.date)) continue;
-      map.set(t.category, (map.get(t.category) ?? 0) + t.amount);
-    }
-    return Array.from(map.entries())
-      .map(([key, amount]) => ({ key, amount }))
-      .sort((a, b) => b.amount - a.amount);
-  }, [transactions]);
-
-  const dayOfMonth = new Date().getDate();
-  const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
-  const dailyPace = spent / Math.max(1, dayOfMonth);
-  const projected = dailyPace * daysInMonth;
-  const onTrack = projected <= monthlyBudget;
+  const onReset = () => {
+    setDraft({ needs: "", wants: "", savings: "" });
+    setSmartBudget({ needs: 0, wants: 0, savings: 0 });
+  };
 
   return (
     <SafeAreaView edges={["top"]} style={[styles.safe, { backgroundColor: colors.surface }]}>
@@ -44,140 +43,138 @@ export default function BudgetScreen() {
         contentContainerStyle={{
           paddingHorizontal: spacing.lg,
           paddingTop: spacing.sm,
-          paddingBottom: Platform.OS === "ios" ? 120 : 100,
+          paddingBottom: Platform.OS === "ios" ? 140 : 120,
         }}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={[styles.title, { color: colors.onSurface }]}>Budget</Text>
+        <Text style={[styles.title, { color: colors.onSurface }]}>Smart Budget</Text>
         <Text style={[styles.subtitle, { color: colors.info }]}>{monthName()}</Text>
 
         <Card variant="secondary" style={{ marginTop: spacing.lg }}>
-          <View style={styles.headerRow}>
-            <Text style={[styles.label, { color: colors.info }]}>Monthly Budget</Text>
-            <Pressable
-              testID="edit-budget-btn"
-              onPress={() => {
-                if (editing) {
-                  const n = Number(draft.replace(/[^0-9.]/g, "")) || 0;
-                  setMonthlyBudget(n);
-                }
-                setEditing((e) => !e);
-              }}
-            >
-              <Text style={{ color: colors.brandPrimary, fontSize: fontSize.base }}>
-                {editing ? "Save" : "Edit"}
-              </Text>
-            </Pressable>
-          </View>
-          {editing ? (
-            <View style={[styles.editRow, { borderColor: colors.border }]}>
-              <Text style={[styles.currencySign, { color: colors.onSurface }]}>₹</Text>
-              <TextInput
-                testID="budget-input"
-                value={draft}
-                onChangeText={setDraft}
-                keyboardType="number-pad"
-                style={[styles.budgetInput, { color: colors.onSurface }]}
-                placeholder="0"
-                placeholderTextColor={colors.info}
-              />
-            </View>
-          ) : (
-            <Text style={[styles.bigAmount, { color: colors.onSurface }]} testID="budget-amount">
-              {formatINR(monthlyBudget)}
-            </Text>
-          )}
-
-          <ProgressBar progress={used} height={12} testID="budget-progress" />
-
-          <View style={styles.metricRow}>
-            <Metric label="Spent" value={formatINR(spent, { compact: true })} tint={colors.error} />
-            <Metric label="Remaining" value={formatINR(remaining, { compact: true })} tint={colors.brandPrimary} />
-            <Metric label="Used" value={`${Math.round(used * 100)}%`} tint={colors.onSurface} />
-          </View>
-
-          <View style={[styles.insight, { backgroundColor: colors.surfaceTertiary }]}>
-            <MaterialCommunityIcons
-              name={
-                monthlyBudget === 0
-                  ? "information-outline"
-                  : onTrack
-                  ? "check-circle-outline"
-                  : "alert-circle-outline"
-              }
-              size={20}
-              color={
-                monthlyBudget === 0
-                  ? colors.brandPrimary
-                  : onTrack
-                  ? colors.success
-                  : colors.warning
-              }
-            />
-            <Text style={[styles.insightText, { color: colors.onSurface }]} numberOfLines={2}>
-              {monthlyBudget === 0
-                ? "Set a monthly budget to track your spending pace."
-                : onTrack
-                ? `On track to save ${formatINR(Math.max(0, monthlyBudget - projected), { compact: true })} this month.`
-                : `At this pace you'll overspend by ${formatINR(projected - monthlyBudget, { compact: true })}.`}
-            </Text>
-          </View>
+          <Text style={[styles.label, { color: colors.info }]}>Total Target</Text>
+          <Text style={[styles.bigAmount, { color: colors.onSurface }]} testID="budget-total-target">
+            {formatINR(smartBudgetTotals.totalTarget)}
+          </Text>
+          <Text style={[styles.helper, { color: colors.info }]}>
+            Targets adapt automatically to your monthly income. Override below if you prefer custom limits.
+          </Text>
         </Card>
 
-        <Text style={[styles.section, { color: colors.onSurface }]}>By Category</Text>
+        {(["needs", "wants", "savings"] as Bucket[]).map((b) => (
+          <BucketEditor
+            key={b}
+            bucket={b}
+            value={draft[b]}
+            placeholder={auto[b] ? String(auto[b]) : "0"}
+            onChange={(v) => setDraft((d) => ({ ...d, [b]: v }))}
+            spent={smartBudgetTotals.spent[b]}
+            target={smartBudgetTotals.targets[b]}
+            progress={smartBudgetTotals.progress[b]}
+          />
+        ))}
 
-        {byCategory.length === 0 ? (
-          <Card variant="secondary">
-            <Text style={{ color: colors.info, fontSize: fontSize.base }}>
-              No expenses this month yet.
+        <View style={styles.btnRow}>
+          <Pressable
+            testID="budget-reset"
+            onPress={onReset}
+            style={[styles.btn, { backgroundColor: colors.surfaceSecondary }]}
+          >
+            <Text style={[styles.btnText, { color: colors.onSurface }]}>Auto</Text>
+          </Pressable>
+          <Pressable
+            testID="budget-save"
+            onPress={onSave}
+            style={[styles.btn, { backgroundColor: colors.brandPrimary, flex: 1 }]}
+          >
+            <Text style={[styles.btnText, { color: colors.onBrandPrimary }]}>
+              {saved ? "Saved" : "Save targets"}
             </Text>
-          </Card>
-        ) : (
-          <Card variant="secondary" padding="md">
-            {byCategory.map((row, i) => {
-              const cat = getCategory(row.key as any);
-              const share = monthlyBudget > 0 ? row.amount / monthlyBudget : 0;
-              return (
-                <View
-                  key={row.key}
-                  style={[
-                    styles.catRow,
-                    i < byCategory.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider },
-                  ]}
-                >
-                  <View style={styles.catTop}>
-                    <View style={styles.catLeft}>
-                      <View style={[styles.catIcon, { backgroundColor: colors.brandTertiary }]}>
-                        <MaterialCommunityIcons
-                          name={cat.icon as keyof typeof MaterialCommunityIcons.glyphMap}
-                          size={18}
-                          color={colors.onBrandTertiary}
-                        />
-                      </View>
-                      <Text style={[styles.catName, { color: colors.onSurface }]}>{cat.label}</Text>
-                    </View>
-                    <Text style={[styles.catAmount, { color: colors.onSurface }]}>
-                      {formatINR(row.amount, { compact: true })}
-                    </Text>
-                  </View>
-                  <ProgressBar progress={share} height={6} />
-                </View>
-              );
-            })}
-          </Card>
-        )}
+          </Pressable>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function Metric({ label, value, tint }: { label: string; value: string; tint: string }) {
+function BucketEditor({
+  bucket,
+  value,
+  placeholder,
+  onChange,
+  spent,
+  target,
+  progress,
+}: {
+  bucket: Bucket;
+  value: string;
+  placeholder: string;
+  onChange: (v: string) => void;
+  spent: number;
+  target: number;
+  progress: number;
+}) {
   const { colors } = useTheme();
+  const meta = BUCKET_META[bucket];
+  const accent =
+    bucket === "needs"
+      ? colors.bucketNeeds
+      : bucket === "wants"
+      ? colors.bucketWants
+      : colors.bucketSavings;
+  const accentSoft =
+    bucket === "needs"
+      ? colors.bucketNeedsSoft
+      : bucket === "wants"
+      ? colors.bucketWantsSoft
+      : colors.bucketSavingsSoft;
+
   return (
-    <View style={styles.metric}>
-      <Text style={[styles.metricLabel, { color: colors.info }]}>{label}</Text>
-      <Text style={[styles.metricValue, { color: tint }]}>{value}</Text>
-    </View>
+    <Card variant="secondary" style={{ marginTop: spacing.md }}>
+      <View style={styles.bucketHeader}>
+        <View style={[styles.bucketIcon, { backgroundColor: accentSoft }]}>
+          <MaterialCommunityIcons
+            name={meta.icon as keyof typeof MaterialCommunityIcons.glyphMap}
+            size={20}
+            color={accent}
+          />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.bucketName, { color: colors.onSurface }]}>{meta.label}</Text>
+          <Text style={[styles.bucketDesc, { color: colors.info }]}>{meta.description}</Text>
+        </View>
+      </View>
+
+      <View style={[styles.inputRow, { borderColor: colors.border }]}>
+        <Text style={[styles.currencySign, { color: colors.onSurface }]}>₹</Text>
+        <TextInput
+          testID={`budget-input-${bucket}`}
+          value={value}
+          onChangeText={(v) => onChange(v.replace(/[^0-9.]/g, ""))}
+          placeholder={placeholder}
+          placeholderTextColor={colors.info}
+          keyboardType="number-pad"
+          style={[styles.input, { color: colors.onSurface }]}
+        />
+      </View>
+
+      <View style={styles.bucketMeta}>
+        <Text style={[styles.meta, { color: colors.info }]}>
+          {bucket === "savings"
+            ? `Saved ${formatINR(spent, { compact: true })} of ${formatINR(target, { compact: true })}`
+            : `Spent ${formatINR(spent, { compact: true })} of ${formatINR(target, { compact: true })}`}
+        </Text>
+        <View style={[styles.track, { backgroundColor: colors.surfaceTertiary }]}>
+          <View
+            style={{
+              width: `${progress * 100}%`,
+              height: "100%",
+              backgroundColor: accent,
+              borderRadius: radius.pill,
+            }}
+          />
+        </View>
+      </View>
+    </Card>
   );
 }
 
@@ -185,36 +182,20 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   title: { fontSize: fontSize["2xl"], fontWeight: "500" },
   subtitle: { fontSize: fontSize.base, marginTop: 2 },
-  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   label: { fontSize: fontSize.sm },
-  bigAmount: { fontSize: 32, fontWeight: "500", marginTop: spacing.xs, marginBottom: spacing.lg },
-  editRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderBottomWidth: 1,
-    marginTop: spacing.sm,
-    marginBottom: spacing.lg,
-  },
-  currencySign: { fontSize: 28, fontWeight: "500", marginRight: spacing.sm },
-  budgetInput: { fontSize: 28, fontWeight: "500", flex: 1, paddingVertical: spacing.sm },
-  metricRow: { flexDirection: "row", marginTop: spacing.md, justifyContent: "space-between" },
-  metric: { flex: 1 },
-  metricLabel: { fontSize: fontSize.sm },
-  metricValue: { fontSize: fontSize.lg, fontWeight: "500", marginTop: 2 },
-  insight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    padding: spacing.md,
-    borderRadius: radius.md,
-    marginTop: spacing.lg,
-  },
-  insightText: { flex: 1, fontSize: fontSize.base },
-  section: { fontSize: fontSize.xl, fontWeight: "500", marginTop: spacing.xl, marginBottom: spacing.sm },
-  catRow: { paddingVertical: spacing.md },
-  catTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.sm },
-  catLeft: { flexDirection: "row", alignItems: "center", flex: 1 },
-  catIcon: { width: 32, height: 32, borderRadius: radius.sm, alignItems: "center", justifyContent: "center", marginRight: spacing.sm },
-  catName: { fontSize: fontSize.base, fontWeight: "500" },
-  catAmount: { fontSize: fontSize.base, fontWeight: "500" },
+  bigAmount: { fontSize: 32, fontWeight: "500", marginTop: spacing.xs },
+  helper: { fontSize: fontSize.sm, marginTop: spacing.sm },
+  bucketHeader: { flexDirection: "row", alignItems: "center", gap: spacing.md, marginBottom: spacing.md },
+  bucketIcon: { width: 40, height: 40, borderRadius: radius.md, alignItems: "center", justifyContent: "center" },
+  bucketName: { fontSize: fontSize.lg, fontWeight: "500" },
+  bucketDesc: { fontSize: fontSize.sm, marginTop: 2 },
+  inputRow: { flexDirection: "row", alignItems: "center", borderBottomWidth: 1, paddingVertical: 4 },
+  currencySign: { fontSize: 24, fontWeight: "500", marginRight: spacing.sm },
+  input: { flex: 1, fontSize: 24, fontWeight: "500", paddingVertical: spacing.sm },
+  bucketMeta: { marginTop: spacing.md, gap: spacing.sm },
+  meta: { fontSize: fontSize.sm },
+  track: { height: 8, borderRadius: radius.pill, overflow: "hidden" },
+  btnRow: { flexDirection: "row", gap: spacing.md, marginTop: spacing.lg },
+  btn: { paddingVertical: spacing.md, paddingHorizontal: spacing.lg, borderRadius: radius.pill, alignItems: "center" },
+  btnText: { fontSize: fontSize.base, fontWeight: "500" },
 });
