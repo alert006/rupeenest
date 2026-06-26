@@ -43,7 +43,7 @@ export default function BudgetScreen() {
         contentContainerStyle={{
           paddingHorizontal: spacing.lg,
           paddingTop: spacing.sm,
-          paddingBottom: Platform.OS === "ios" ? 140 : 120,
+          paddingBottom: Platform.OS === "ios" ? 220 : 200,
         }}
         showsVerticalScrollIndicator={false}
       >
