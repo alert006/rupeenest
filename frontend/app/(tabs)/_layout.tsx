@@ -24,8 +24,9 @@ export default function TabsLayout() {
                 ? colors.surfaceSecondary
                 : colors.surface
               : "transparent",
-          height: Platform.OS === "ios" ? 84 : 64,
-          paddingTop: 6,
+          height: 86,
+paddingTop: 10,
+paddingBottom: 12,
         },
         tabBarBackground: () =>
           Platform.OS === "ios" ? (

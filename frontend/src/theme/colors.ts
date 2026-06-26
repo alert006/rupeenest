@@ -1,30 +1,41 @@
 export const lightColors = {
-  surface: "#F6FAF8",
-  onSurface: "#1A2E28",
-  surfaceSecondary: "#E7F3EF",
-  onSurfaceSecondary: "#223D35",
-  surfaceTertiary: "#D1EAE1",
-  onSurfaceTertiary: "#18382F",
-  surfaceInverse: "#1F2B27",
-  onSurfaceInverse: "#F6FAF8",
-  brand: "#056C5A",
-  brandPrimary: "#056C5A",
+  surface: "#FFFFFF",
+  onSurface: "#111827",
+
+  surfaceSecondary: "#F8FAFC",
+  onSurfaceSecondary: "#334155",
+
+  surfaceTertiary: "#EFF6FF",
+  onSurfaceTertiary: "#1E3A8A",
+
+  surfaceInverse: "#1E3A8A",
+  onSurfaceInverse: "#FFFFFF",
+
+  brand: "#2563EB",
+  brandPrimary: "#2563EB",
   onBrandPrimary: "#FFFFFF",
-  brandSecondary: "#128F76",
+
+  brandSecondary: "#60A5FA",
   onBrandSecondary: "#FFFFFF",
-  brandTertiary: "#A5D6C9",
-  onBrandTertiary: "#0B4A3E",
-  success: "#1E874B",
+
+  brandTertiary: "#DBEAFE",
+  onBrandTertiary: "#1E3A8A",
+
+  success: "#16A34A",
   onSuccess: "#FFFFFF",
-  warning: "#C76D00",
+
+  warning: "#F59E0B",
   onWarning: "#FFFFFF",
-  error: "#BA1A1A",
+
+  error: "#DC2626",
   onError: "#FFFFFF",
-  info: "#6D726F",
+
+  info: "#3B82F6",
   onInfo: "#FFFFFF",
-  border: "#D1EAE1",
-  borderStrong: "#A5D6C9",
-  divider: "#E7F3EF",
+
+  border: "#E5E7EB",
+  borderStrong: "#93C5FD",
+  divider: "#F1F5F9",
 };
 
 export const darkColors = {
